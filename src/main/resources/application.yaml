@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: kafka-ping-pong
+  cloud:
+    function:
+      definition: "pongConsumer"
+    stream:
+      bindings:
+        pongConsumer-in-0:
+          destination: ping.out
+          group: kafka_ping_out_first
+        ping-out-0:
+          destination: ping.out
