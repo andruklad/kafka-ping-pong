@@ -101,9 +101,7 @@ public class PongService {
         List<MsgEvent> eventsByTypePing = msgEventService.getNewEventsByType(MsgType.PING);
         // Маппинг в список событий для публикации в приложении
         List<PongReceiveEvent> pongReceiveEvents = eventsByTypePing.stream()
-                .map(ev -> {
-                    return new PongReceiveEvent(this, ev.getId());
-                }).collect(Collectors.toUnmodifiableList());
+                .map(ev -> new PongReceiveEvent(this, ev.getId())).toList();
         // Публикация событий в приложении
         for (PongReceiveEvent pongReceiveEvent: pongReceiveEvents) {
             applicationEventPublisher.publishEvent(pongReceiveEvent);

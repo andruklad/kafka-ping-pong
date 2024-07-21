@@ -16,7 +16,6 @@ public class PongConsumer {
     @Bean
     public Consumer<String> pongConsumerFunction() {
 
-        return msg ->
-            pongService.processMsgFromPing(msg);
+        return pongService::processMsgFromPing;
     }
 }
