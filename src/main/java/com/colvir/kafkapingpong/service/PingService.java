@@ -1,9 +1,12 @@
 package com.colvir.kafkapingpong.service;
 
+import com.colvir.kafkapingpong.config.Config;
 import com.colvir.kafkapingpong.dto.KafkaMessage;
+import com.colvir.kafkapingpong.entity.MsgType;
 import com.colvir.kafkapingpong.kafka.PingProducer;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,35 +17,51 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class PingService {
 
-    @Autowired
-    private MsgKafkaService msgKafkaService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Autowired
-    private PingProducer pingProducer;
+    private final MsgKafkaService msgKafkaService;
 
-    @Scheduled(fixedDelay = 500000)
+    private final MsgEventService msgEventService;
+
+    private final PingProducer pingProducer;
+
+    private final Config config;
+
+    @Scheduled(fixedDelayString = "${app.pingMessageDelay}")
     public void pingMessage() {
 
-        KafkaMessage pingMessage = msgKafkaService.createKafkaMessage();
-        pingProducer.sendMsgToPingOutTopic(pingMessage);
+        if (config.getEnablePingMessage() == 1) {
+            KafkaMessage pingMessage = msgKafkaService.createKafkaMessage();
+            pingProducer.sendMsgToPingOutTopic(pingMessage);
+        }
     }
 
     @Transactional
     public void processMsgFromPong(String msg) {
 
-        // Сохраняем событие получения сообщения от сервиса Ping в БД
-//        Integer msgEventId = savePongReceiveEvent(msg);
-
-        // Регистрируем событие на уровне приложения
-//        publishPongReceiveEvent(msgEventId);
+        // Сохраняем в БД событие получения сообщения от сервиса Ping
+        Integer msgEventId = savePingReceiveEvent(msg);
 
         // Записываем событие в лог
-        System.out.printf("Msg %s, time: %s, event id: %s\n", msg, LocalDateTime.now(), null);
-//        logPongReceiveEvent(msg, msgEventId);
+        logPingReceiveEvent(msg, msgEventId);
     }
 
-//    private void logPongReceiveEvent(String msg, Integer msgEventId) {
-//
-//        System.out.printf("Msg %s, time: %s, event id: %s\n", msg, LocalDateTime.now(), msgEventId);
-//    }
+    private Integer savePingReceiveEvent(String msg) {
+
+        LocalDateTime currentDateTime = LocalDateTime.now();
+        // Маппинг сообщения в KafkaMessage
+        KafkaMessage kafkaMessage;
+        try {
+            kafkaMessage = objectMapper.readValue(msg, KafkaMessage.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+        Integer msgEventId = msgEventService.saveMsgEvent(currentDateTime, MsgType.PONG, kafkaMessage);
+        return msgEventId;
+    }
+
+    private void logPingReceiveEvent(String msg, Integer msgEventId) {
+
+        System.out.printf("Log logPingReceiveEvent. Msg %s, time: %s, event id: %s\n", msg, LocalDateTime.now(), msgEventId);
+    }
 }

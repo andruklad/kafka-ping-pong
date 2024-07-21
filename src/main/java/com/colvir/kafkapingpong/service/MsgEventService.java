@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Service
@@ -38,16 +39,16 @@ public class MsgEventService {
         }
     }
 
-//    public void updateStatusToProcessed(Integer id) {
-//
-//        MsgEvent event = msgEventRepository.findById(id).get();
-//        event.setStatus(MsgStatus.PROCESSED);
-//        msgEventRepository.save(event);
-//    }
-//
-//    public List<MsgEvent> getNewEventsByType(MsgType msgType) {
-//
-//        return msgEventRepository.findAllByTypeAndStatus(msgType, MsgStatus.NEW);
-//    }
+    public void updateStatusToProcessed(Integer id) {
+
+        MsgEvent event = msgEventRepository.findById(id).get();
+        event.setStatus(MsgStatus.PROCESSED);
+        msgEventRepository.save(event);
+    }
+
+    public List<MsgEvent> getNewEventsByType(MsgType msgType) {
+
+        return msgEventRepository.findAllByTypeAndStatus(msgType, MsgStatus.NEW);
+    }
 
 }

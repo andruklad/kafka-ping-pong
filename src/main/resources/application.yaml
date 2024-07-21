@@ -28,3 +28,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+
+app:
+  enablePingMessage: 1
+  pingMessageDelay: 10000
+  enablePublishPongReceiveEvent: 1

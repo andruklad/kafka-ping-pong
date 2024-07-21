@@ -1,14 +1,17 @@
 package com.colvir.kafkapingpong.service;
 
+import com.colvir.kafkapingpong.config.Config;
 import com.colvir.kafkapingpong.dto.KafkaMessage;
+import com.colvir.kafkapingpong.entity.MsgEvent;
 import com.colvir.kafkapingpong.entity.MsgType;
 import com.colvir.kafkapingpong.event.PongReceiveEvent;
 import com.colvir.kafkapingpong.kafka.PongProducer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +19,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
@@ -27,11 +32,11 @@ public class PongService {
 
     private final ApplicationEventPublisher applicationEventPublisher;
 
-    @Autowired
-    private PongProducer pongProducer;
+    private final PongProducer pongProducer;
 
-    @Autowired
-    private MsgKafkaService msgKafkaService;
+    private final MsgKafkaService msgKafkaService;
+
+    private final Config config;
 
     @Transactional
     public void processMsgFromPing(String msg) {
@@ -40,7 +45,9 @@ public class PongService {
         Integer msgEventId = savePongReceiveEvent(msg);
 
         // Регистрируем событие на уровне приложения
-        publishPongReceiveEvent(msgEventId);
+        if (config.getEnablePublishPongReceiveEvent() == 1) {
+            publishPongReceiveEvent(msgEventId);
+        }
 
         // Записываем событие в лог
         logPongReceiveEvent(msg, msgEventId);
@@ -68,7 +75,7 @@ public class PongService {
 
     private void logPongReceiveEvent(String msg, Integer msgEventId) {
 
-        System.out.printf("Msg %s, time: %s, event id: %s\n", msg, LocalDateTime.now(), msgEventId);
+        System.out.printf("Log logPongReceiveEvent. Msg %s, time: %s, event id: %s\n", msg, LocalDateTime.now(), msgEventId);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -77,12 +84,30 @@ public class PongService {
 
         System.out.printf("handlePongReceiveEvent pongReceiveEvent: %s\n", pongReceiveEvent);
         pongMessage();
+        msgEventService.updateStatusToProcessed(pongReceiveEvent.getEventId());
     }
 
     public void pongMessage() {
 
         KafkaMessage pongMessage = msgKafkaService.createKafkaMessage();
         pongProducer.sendMsgToPongOutTopic(pongMessage);
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void listenerContext() {
+
+        // Получение списка новых событий типа PING из БД
+        List<MsgEvent> eventsByTypePing = msgEventService.getNewEventsByType(MsgType.PING);
+        // Маппинг в список событий для публикации в приложении
+        List<PongReceiveEvent> pongReceiveEvents = eventsByTypePing.stream()
+                .map(ev -> {
+                    return new PongReceiveEvent(this, ev.getId());
+                }).collect(Collectors.toUnmodifiableList());
+        // Публикация событий в приложении
+        for (PongReceiveEvent pongReceiveEvent: pongReceiveEvents) {
+            applicationEventPublisher.publishEvent(pongReceiveEvent);
+        }
     }
 
 }
