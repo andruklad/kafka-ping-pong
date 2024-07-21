@@ -3,11 +3,28 @@ spring:
     name: kafka-ping-pong
   cloud:
     function:
-      definition: "pongConsumer"
+      definition: "pongConsumerFunction;pingConsumerFunction"
     stream:
       bindings:
-        pongConsumer-in-0:
+        # pong consumer
+        pongConsumerFunction-in-0:
           destination: ping.out
           group: kafka_ping_out_first
         ping-out-0:
           destination: ping.out
+        # ping consumer
+        pingConsumerFunction-in-0:
+          destination: pong.out
+          group: kafka_pong_out_first
+        pong-out-0:
+          destination: pong.out
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: postgres
+
+  jpa:
+    hibernate:
+      ddl-auto: update
